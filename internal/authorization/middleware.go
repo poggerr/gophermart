@@ -17,6 +17,10 @@ func AuthMiddleware(h http.Handler) http.Handler {
 			return
 		}
 		user := GetUserID(c.Value)
+		if user == nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 
 		ur := r.WithContext(NewContext(r.Context(), user))
 

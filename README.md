@@ -1,25 +1,87 @@
-# go-musthave-diploma-tpl
+# Gophermart (loyalty system)
 
-Шаблон репозитория для индивидуального дипломного проекта курса «Go-разработчик»
+Накопительная система лояльности "Гофермарт" — HTTP API на Go + PostgreSQL.
 
-# Начало работы
+## Эндпоинты
 
-1. Склонируйте репозиторий в любую подходящую директорию на вашем компьютере.
-2. В корне репозитория выполните команду `go mod init <name>` (где `<name>` — адрес вашего репозитория на GitHub без
-   префикса `https://`) для создания модуля
+API описано в `SPECIFICATION.md`, а маршруты приложения задаются в `internal/routers/routers.go`.
 
-# Обновление шаблона
+Без авторизации доступны:
+- `POST /api/user/register` — регистрация (автоматическая аутентификация)
+- `POST /api/user/login` — логин (выдаётся JWT в Cookie)
 
-Чтобы иметь возможность получать обновления автотестов и других частей шаблона, выполните команду:
+Только для авторизованных пользователей:
+- `POST /api/user/orders` — загрузка номера заказа (plain text число)
+- `GET /api/user/orders` — список загруженных номеров и статусов
+- `GET /api/user/balance` — баланс и выведенные за весь период средства
+- `POST /api/user/balance/withdraw` — списание баллов за заказ
+- `GET /api/user/withdrawals` — история списаний
 
+## Авторизация
+
+Авторизация реализована через Cookie `session_token` (JWT) в `internal/authorization`.
+
+Для подписи JWT обязателен `SECRET_KEY` (переменная окружения).
+
+## Внешний сервис accrual
+
+Начисления по заказам рассчитываются внешним сервисом (black-box).
+
+Приложение обращается к:
+- `GET /api/orders/{number}`
+
+Адрес этого сервиса задаётся через `ACCRUAL_SYSTEM_ADDRESS` (или флаг `-r`).
+
+## Конфигурация
+
+Комбинации `ENV`/флагов:
+- `RUN_ADDRESS` / `-a` (по умолчанию `:8080`)
+- `DATABASE_URI` / `-d` (по умолчанию `host=localhost user=gophermart password=userpassword dbname=gophermart sslmode=disable`)
+- `ACCRUAL_SYSTEM_ADDRESS` / `-r` (по умолчанию `http://localhost:8080`)
+- `SECRET_KEY` — секрет для JWT (обязательно)
+
+## Запуск
+
+1. Подготовьте PostgreSQL (по умолчанию используется база `gophermart` и пользователь `gophermart`).
+2. Соберите бинарник:
+
+```sh
+(cd cmd/gophermart && go build -buildvcs=false -o gophermart)
 ```
-git remote add -m master template https://github.com/yandex-praktikum/go-musthave-diploma-tpl.git
+
+3. Запустите:
+
+```sh
+export RUN_ADDRESS=":8080"
+export DATABASE_URI="host=localhost user=gophermart password=userpassword dbname=gophermart sslmode=disable"
+export ACCRUAL_SYSTEM_ADDRESS="http://localhost:8080"
+export SECRET_KEY="change-me"
+
+./cmd/gophermart/gophermart
 ```
 
-Для обновления кода автотестов выполните команду:
+Флаги `-a/-d/-r` поддерживаются в `internal/config`.
 
-```
-git fetch template && git checkout template/master .github
+## Формат запросов
+
+`POST /api/user/register` и `POST /api/user/login`:
+
+```json
+{
+  "login": "user",
+  "password": "pass"
+}
 ```
 
-Затем добавьте полученные изменения в свой репозиторий.
+`POST /api/user/orders`:
+- body: `plain text` число (номер заказа)
+
+`POST /api/user/balance/withdraw`:
+
+```json
+{
+  "order": "2377225624",
+  "sum": 751
+}
+```
+

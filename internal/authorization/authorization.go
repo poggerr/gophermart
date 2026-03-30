@@ -22,6 +22,9 @@ const TokenExp = time.Hour * 3
 func BuildJWTString(uuid *uuid.UUID) (string, error) {
 
 	var secretKey = os.Getenv("SECRET_KEY")
+	if secretKey == "" {
+		return "", errors.New("env SECRET_KEY is required")
+	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -37,12 +40,18 @@ func BuildJWTString(uuid *uuid.UUID) (string, error) {
 }
 
 func GetUserID(tokenString string) *uuid.UUID {
-	//var secretKey = os.Getenv("SECRET_KEY")
-	var secretKey = "scdcsdc,HVJHVCAJscdJccdsJVDVJDvqwe[p[;cqsc09cah989h"
+	secretKey := os.Getenv("SECRET_KEY")
+	if secretKey == "" {
+		return nil
+	}
+
 	claims := &Claims{}
-	jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 		return []byte(secretKey), nil
 	})
+	if err != nil || token == nil || !token.Valid {
+		return nil
+	}
 	return claims.UserID
 }
 
