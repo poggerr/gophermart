@@ -16,6 +16,11 @@ func (a *App) Withdrawals(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if len(*withdrawals) == 0 {
+		res.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	marshal, err := json.Marshal(withdrawals)
 	if err != nil {
 		a.sugaredLogger.Info(err)
@@ -23,7 +28,7 @@ func (a *App) Withdrawals(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	res.Header().Set("content-type", "application/json ")
+	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	res.Write(marshal)
 }

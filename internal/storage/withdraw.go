@@ -31,7 +31,7 @@ func (strg *Storage) TakeUserWithdrawals(userID *uuid.UUID) (*models.Withdrawals
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	rows, err := strg.DB.QueryContext(ctx, "SELECT * FROM withdrawals WHERE order_user=$1", userID)
+	rows, err := strg.DB.QueryContext(ctx, "SELECT * FROM withdrawals WHERE order_user=$1 ORDER BY processed_at", userID)
 	if err != nil {
 		logger.Initialize().Info(err)
 		return nil, err

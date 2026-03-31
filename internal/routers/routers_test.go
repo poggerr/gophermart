@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 )
@@ -34,25 +34,6 @@ func NewDefConf() *config.Config {
 	conf.Backoff.MaxElapsedTime = 10 * time.Second
 	return &conf
 }
-
-var sugaredLogger = logger.Initialize()
-var cfg = NewDefConf()
-var strg = storage.NewStorage(connectDB(), cfg)
-var newRepo = async.NewRepo(strg)
-var newApp = app.NewApp(cfg, strg, sugaredLogger, newRepo)
-
-func connectDB() *sqlx.DB {
-	db, err := sqlx.Connect("postgres", cfg.DB)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	return db
-}
-
-//func AddedDataToDB()  {
-//	strg.RestoreDB()
-//
-//}
 
 func testRequestPost(t *testing.T, ts *httptest.Server, method,
 	path string, data string) (*http.Response, string) {
@@ -90,7 +71,27 @@ type UserReg struct {
 }
 
 func TestHandlersPost(t *testing.T) {
-	go newRepo.WorkerAccrual()
+	// This is an integration-style test and requires PostgreSQL.
+	cfg := NewDefConf()
+	if v := os.Getenv("DATABASE_URI"); v != "" {
+		cfg.DB = v
+	}
+	if os.Getenv("SECRET_KEY") == "" {
+		_ = os.Setenv("SECRET_KEY", "test-secret")
+	}
+
+	db, err := sqlx.Connect("postgres", cfg.DB)
+	if err != nil {
+		t.Skipf("postgres is not available: %v", err)
+		return
+	}
+	defer db.Close()
+
+	sugaredLogger := logger.Initialize()
+	strg := storage.NewStorage(db, cfg)
+	repo := async.NewRepo(strg)
+	newApp := app.NewApp(cfg, strg, sugaredLogger, repo)
+
 	ts := httptest.NewServer(Router(newApp))
 	defer ts.Close()
 

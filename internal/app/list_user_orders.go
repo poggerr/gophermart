@@ -12,6 +12,11 @@ func (a *App) ListUserOrders(res http.ResponseWriter, req *http.Request) {
 	orders, err := a.strg.TakeUserOrders(userID)
 	if err != nil {
 		a.sugaredLogger.Info(err)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if len(*orders) == 0 {
 		res.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -23,7 +28,7 @@ func (a *App) ListUserOrders(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	res.Header().Set("content-type", "application/json ")
+	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	res.Write(marshal)
 

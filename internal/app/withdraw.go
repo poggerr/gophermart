@@ -2,13 +2,17 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/google/uuid"
 	"github.com/poggerr/gophermart/internal/authorization"
 	"github.com/poggerr/gophermart/internal/models"
+	"github.com/poggerr/gophermart/internal/ordervalidation"
 	"io"
 	"net/http"
-	"strconv"
+	"strings"
 )
+
+var ErrInsufficientFunds = errors.New("insufficient funds")
 
 func (a *App) checkBalance(withdraw *models.Withdraw, userID *uuid.UUID) error {
 	balance, err := a.strg.TakeUserBalance(userID)
@@ -18,7 +22,7 @@ func (a *App) checkBalance(withdraw *models.Withdraw, userID *uuid.UUID) error {
 	}
 
 	if balance.Current < withdraw.Sum {
-		return err
+		return ErrInsufficientFunds
 	}
 	return nil
 }
@@ -49,14 +53,18 @@ func (a *App) Withdraw(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	order, err := strconv.Atoi(withdraw.OrderNumber)
-	if err != nil {
-		a.sugaredLogger.Info(err)
-		res.WriteHeader(http.StatusBadRequest)
+	withdraw.OrderNumber = strings.TrimSpace(withdraw.OrderNumber)
+	if withdraw.OrderNumber == "" {
+		res.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
-	_, isStore := a.strg.TakeOrderByUser(order)
+	if !ordervalidation.OrderValidation(withdraw.OrderNumber) {
+		res.WriteHeader(http.StatusUnprocessableEntity)
+		return
+	}
+
+	_, isStore := a.strg.TakeOrderByUser(withdraw.OrderNumber)
 	if isStore {
 		res.WriteHeader(http.StatusUnprocessableEntity)
 		return
@@ -64,7 +72,11 @@ func (a *App) Withdraw(res http.ResponseWriter, req *http.Request) {
 
 	err = a.checkBalance(withdraw, userID)
 	if err != nil {
-		res.WriteHeader(http.StatusPaymentRequired)
+		if errors.Is(err, ErrInsufficientFunds) {
+			res.WriteHeader(http.StatusPaymentRequired)
+		} else {
+			res.WriteHeader(http.StatusInternalServerError)
+		}
 		return
 	}
 

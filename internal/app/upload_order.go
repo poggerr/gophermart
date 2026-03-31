@@ -5,7 +5,7 @@ import (
 	"github.com/poggerr/gophermart/internal/ordervalidation"
 	"io"
 	"net/http"
-	"strconv"
+	"strings"
 )
 
 func (a *App) UploadOrder(res http.ResponseWriter, req *http.Request) {
@@ -18,20 +18,19 @@ func (a *App) UploadOrder(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	order, err := strconv.Atoi(string(body))
-	if err != nil {
-		a.sugaredLogger.Info(err)
+	orderNumber := strings.TrimSpace(string(body))
+	if orderNumber == "" {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	isValid := ordervalidation.OrderValidation(order)
+	isValid := ordervalidation.OrderValidation(orderNumber)
 	if !isValid {
 		res.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
-	user, isUsed := a.strg.TakeOrderByUser(order)
+	user, isUsed := a.strg.TakeOrderByUser(orderNumber)
 	if isUsed {
 		switch *user {
 		case *userID:
@@ -43,14 +42,14 @@ func (a *App) UploadOrder(res http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	err = a.strg.SaveOrder(order, userID)
+	err = a.strg.SaveOrder(orderNumber, userID)
 	if err != nil {
 		a.sugaredLogger.Info(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	a.repo.SendToChan(string(body), userID, a.cfg.Accrual)
+	a.repo.SendToChan(orderNumber, userID, a.cfg.Accrual)
 
 	res.WriteHeader(http.StatusAccepted)
 

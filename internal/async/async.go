@@ -3,6 +3,7 @@ package async
 import (
 	"github.com/google/uuid"
 	"github.com/poggerr/gophermart/internal/storage"
+	"time"
 )
 
 type AccrualRepo struct {
@@ -27,7 +28,17 @@ func (r *AccrualRepo) SendToChan(orderNum string, user *uuid.UUID, accrualURL st
 
 func (r *AccrualRepo) WorkerAccrual() {
 	for accrual := range r.takeAccrualChan {
-		r.repository.UpdateOrder(accrual)
+		done, after := r.repository.UpdateOrder(accrual)
+		if done {
+			continue
+		}
+		if after <= 0 {
+			after = 1 * time.Second
+		}
+		next := accrual
+		time.AfterFunc(after, func() {
+			r.SendToChan(next.OrderNum, next.User, next.AccrualURL)
+		})
 	}
 
 }

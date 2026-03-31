@@ -1,21 +1,27 @@
 package ordervalidation
 
-func OrderValidation(number int) bool {
-	return (number%10+checksum(number/10))%10 == 0
-}
+func OrderValidation(number string) bool {
+	if len(number) == 0 {
+		return false
+	}
 
-func checksum(number int) int {
-	var luhn int
-	for i := 0; number > 0; i++ {
-		cur := number % 10
-		if i%2 == 0 { // even
-			cur = cur * 2
-			if cur > 9 {
-				cur = cur%10 + cur/10
+	sum := 0
+	double := false
+
+	for i := len(number) - 1; i >= 0; i-- {
+		d := int(number[i] - '0')
+		if d < 0 || d > 9 {
+			return false
+		}
+		if double {
+			d *= 2
+			if d > 9 {
+				d -= 9
 			}
 		}
-		luhn += cur
-		number = number / 10
+		sum += d
+		double = !double
 	}
-	return luhn % 10
+
+	return sum%10 == 0
 }
